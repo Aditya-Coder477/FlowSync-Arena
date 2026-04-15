@@ -1,0 +1,86 @@
+"""FastAPI application entrypoint."""
+from __future__ import annotations
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.config import get_settings
+from app.services.firestore import init_firestore, seed_initial_data
+from app.services.redis_client import init_redis, close_redis
+from app.routers import zones, routes, queues, alerts, admin, digital_twin, emergency
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown lifecycle."""
+    logger.info("Starting FlowSync Arena API...")
+    init_firestore()
+    await init_redis()
+    await seed_initial_data()
+    logger.info("All services ready.")
+    yield
+    logger.info("Shutting down...")
+    await close_redis()
+
+
+app = FastAPI(
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
+    description=(
+        "FlowSync Arena — Real-time crowd management API. "
+        "Provides zone density, smart routing, queue prediction, alerts, and analytics."
+    ),
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Routers
+app.include_router(zones.router)
+app.include_router(routes.router)
+app.include_router(queues.router)
+app.include_router(alerts.router)
+app.include_router(admin.router)
+app.include_router(digital_twin.router)
+app.include_router(emergency.router)
+
+@app.get("/", tags=["health"])
+async def root():
+    return {
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "status": "operational",
+        "environment": settings.ENVIRONMENT,
+    }
+
+
+@app.get("/health", tags=["health"])
+async def health():
+    return JSONResponse({"status": "ok"})
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Something went wrong on our end. We're looking into it."},
+    )
