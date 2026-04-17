@@ -1,0 +1,21 @@
+# .gcloudignore — controls what gcloud builds submit uploads to GCS
+# Without this, node_modules (300MB+) gets uploaded unnecessarily
+
+# Dependencies — rebuilt during Docker build
+node_modules/
+
+# Next.js build output — rebuilt during Docker build
+.next/
+out/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Dev artifacts
+.git/
+.vscode/
+.idea/
+README.md
+*.md

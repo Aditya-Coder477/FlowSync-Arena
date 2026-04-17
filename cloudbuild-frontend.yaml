@@ -1,0 +1,29 @@
+# Google Cloud Build config for the FlowSync Arena frontend
+# Accepts _NEXT_PUBLIC_API_URL as a substitution variable (the backend Cloud Run URL)
+#
+# Usage:
+#   gcloud builds submit ./frontend ^
+#     --config=cloudbuild-frontend.yaml ^
+#     --substitutions=_NEXT_PUBLIC_API_URL=https://YOUR_BACKEND_URL
+#
+substitutions:
+  _NEXT_PUBLIC_API_URL: "http://localhost:8080"  # default, always overridden by CLI
+  _IMAGE: "asia-south1-docker.pkg.dev/flowsync-arena/flowsync-repo/frontend:latest"
+
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - build
+      - "--platform=linux/amd64"
+      - "--build-arg"
+      - "NEXT_PUBLIC_API_URL=${_NEXT_PUBLIC_API_URL}"
+      - "-t"
+      - "${_IMAGE}"
+      - "."
+
+images:
+  - "${_IMAGE}"
+
+options:
+  machineType: "E2_HIGHCPU_8"   # More CPU for Next.js compilation
+  logging: CLOUD_LOGGING_ONLY

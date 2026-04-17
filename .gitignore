@@ -14,7 +14,11 @@ node_modules/
 secrets/
 *.json
 !package.json
+!package-lock.json
 !tsconfig.json
+
+# Production env files — template only, never actuals
+.env.production
 
 # IDE
 .vscode/

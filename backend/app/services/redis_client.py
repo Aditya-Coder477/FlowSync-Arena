@@ -1,4 +1,9 @@
-"""Redis service — async client for caching and real-time state."""
+"""Redis service — async client for caching and real-time state.
+
+Redis is OPTIONAL. When REDIS_HOST is not configured (or Redis is unreachable),
+all cache operations silently no-op and the app reads directly from Firestore.
+This allows the app to run on Cloud Run without any managed Redis instance.
+"""
 from __future__ import annotations
 import json
 import logging
@@ -13,23 +18,35 @@ _redis: Optional[aioredis.Redis] = None
 
 
 async def init_redis() -> None:
-    """Connect to Redis. Password optional (local dev may not need it)."""
+    """Connect to Redis only if REDIS_HOST is configured."""
     global _redis
+
+    if not settings.redis_enabled:
+        logger.info("Redis not configured (REDIS_HOST is empty). Running without cache.")
+        return
+
     try:
         host = settings.REDIS_HOST
         port = settings.REDIS_PORT
         password = settings.REDIS_PASSWORD or None
 
-        _redis = aioredis.Redis(
-            host=host,
-            port=port,
-            password=password,
-            db=settings.REDIS_DB,
-            decode_responses=True,
-            socket_connect_timeout=5,
-        )
+        connection_kwargs: dict[str, Any] = {
+            "host": host,
+            "port": port,
+            "password": password,
+            "db": settings.REDIS_DB,
+            "decode_responses": True,
+            "socket_connect_timeout": 5,
+        }
+
+        # TLS support for Google Cloud Memorystore
+        if settings.REDIS_TLS:
+            connection_kwargs["ssl"] = True
+            connection_kwargs["ssl_cert_reqs"] = None  # Memorystore uses managed certs
+
+        _redis = aioredis.Redis(**connection_kwargs)
         await _redis.ping()
-        logger.info(f"Redis connected at {host}:{port}")
+        logger.info(f"Redis connected at {host}:{port} (TLS={settings.REDIS_TLS})")
     except Exception as e:
         logger.warning(f"Redis unavailable ({e}). Real-time caching will be skipped.")
         _redis = None

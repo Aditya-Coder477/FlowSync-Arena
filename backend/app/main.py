@@ -23,10 +23,23 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
     logger.info("Starting FlowSync Arena API...")
-    init_firestore()
+
+    try:
+        init_firestore()
+        logger.info("Firestore initialised.")
+    except Exception as e:
+        logger.error(f"Firestore init failed — check that Firestore database exists in project: {e}")
+
     await init_redis()
-    await seed_initial_data()
-    logger.info("All services ready.")
+
+    try:
+        await seed_initial_data()
+    except Exception as e:
+        logger.warning(
+            f"Firestore seeding skipped — database may not exist yet or credentials missing: {e}"
+        )
+
+    logger.info("FlowSync Arena API startup complete.")
     yield
     logger.info("Shutting down...")
     await close_redis()
@@ -47,7 +60,7 @@ app = FastAPI(
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

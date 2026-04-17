@@ -1,6 +1,22 @@
 version: '3.9'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# FlowSync Arena — Local Development Orchestration
+#
+# Usage:
+#   1. Copy backend/.env.example to backend/.env and fill in values
+#   2. Place your GCP service account JSON at ./secrets/service-account.json
+#   3. Run: docker compose up --build
+#
+# Services:
+#   redis    → Local Redis cache (localhost:6379)
+#   backend  → FastAPI on localhost:8080  → docs at http://localhost:8080/docs
+#   frontend → Next.js  on localhost:3000 → http://localhost:3000
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
+
+  # ── Redis (local only — not deployed to Cloud Run) ──────────────────────────
   redis:
     image: redis:7-alpine
     ports:
@@ -14,8 +30,11 @@ services:
       timeout: 3s
       retries: 5
 
+  # ── Backend ──────────────────────────────────────────────────────────────────
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
@@ -23,10 +42,13 @@ services:
       - GOOGLE_APPLICATION_CREDENTIALS=/secrets/service-account.json
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_TLS=false
       - ENVIRONMENT=development
       - DEBUG=true
+      - ALLOWED_ORIGINS=http://localhost:3000
     volumes:
-      # Mount your GCP service account key for local dev
+      # Mount your GCP service account key for local dev (read-only)
       - ./secrets:/secrets:ro
     depends_on:
       redis:
@@ -36,15 +58,21 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
+  # ── Frontend ──────────────────────────────────────────────────────────────────
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked into Next.js bundle at build time
+        - NEXT_PUBLIC_API_URL=http://localhost:8080
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   redis_data:
