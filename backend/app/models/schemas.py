@@ -132,8 +132,8 @@ class Alert(BaseModel):
 
 class AlertCreate(BaseModel):
     severity: AlertSeverity
-    title: str
-    message: str
+    title: str = Field(min_length=1, max_length=120)
+    message: str = Field(min_length=1, max_length=500)
     zone_id: Optional[str] = None
 
 
@@ -154,8 +154,8 @@ class StaffTask(BaseModel):
 
 class StaffTaskCreate(BaseModel):
     priority: TaskPriority
-    title: str
-    description: Optional[str] = None
+    title: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = Field(default=None, max_length=1000)
     zone_id: Optional[str] = None
     staff_id: Optional[str] = None
 

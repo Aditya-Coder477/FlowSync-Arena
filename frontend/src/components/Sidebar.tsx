@@ -30,7 +30,7 @@ export function Sidebar({ calmMode }: SidebarProps) {
   const pathname = usePathname()
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Application sidebar">
       <div className="sidebar-logo">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
           {/* Logo mark */}
@@ -57,15 +57,17 @@ export function Sidebar({ calmMode }: SidebarProps) {
       </div>
 
       {navItems.map(group => (
-        <nav key={group.section} className="nav-section">
-          <div className="nav-section-label">{group.section}</div>
+        <nav key={group.section} className="nav-section" aria-label={group.section}>
+          <div className="nav-section-label" aria-hidden="true">{group.section}</div>
           {group.items.map(item => (
             <Link
               key={item.href}
               href={item.href}
               className={clsx('nav-item', { active: pathname.startsWith(item.href) })}
+              aria-current={pathname.startsWith(item.href) ? 'page' : undefined}
+              aria-label={`${item.label} — ${item.description}`}
             >
-              <span style={{ fontSize: 16, lineHeight: 1, opacity: 0.9 }}>{item.icon}</span>
+              <span style={{ fontSize: 16, lineHeight: 1, opacity: 0.9 }} aria-hidden="true">{item.icon}</span>
               <span>{item.label}</span>
             </Link>
           ))}

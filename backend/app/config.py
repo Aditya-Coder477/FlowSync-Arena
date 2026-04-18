@@ -10,10 +10,22 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
 
+    # Logging
+    LOG_LEVEL: str = "INFO"  # DEBUG | INFO | WARNING | ERROR
+
     # Google Cloud / Firestore
     GOOGLE_CLOUD_PROJECT: str = "flowsync-arena"
     GOOGLE_APPLICATION_CREDENTIALS: str = ""  # Path to service account JSON (local dev only)
     # In Cloud Run, leave blank — ADC is used automatically via attached service account
+
+    # Google Cloud Logging (structured JSON logs in Cloud Run)
+    # Set to true in production to route all Python logs to Cloud Logging.
+    CLOUD_LOGGING_ENABLED: bool = False
+
+    # Google Cloud Secret Manager
+    # When true (production), secrets are fetched from Secret Manager at startup.
+    # When false (local dev), secrets are read from .env / environment variables.
+    CLOUD_SECRET_MANAGER_ENABLED: bool = False
 
     # Redis — all optional. App degrades gracefully when Redis is unavailable.
     REDIS_HOST: str = ""          # Empty = Redis disabled
@@ -27,6 +39,7 @@ class Settings(BaseSettings):
     SESSION_TTL: int = 3600
     ALERT_TTL: int = 300
     QUEUE_STATE_TTL: int = 20
+    ADMIN_ANALYTICS_TTL: int = 30  # Cache admin analytics for 30 seconds
 
     # CORS — comma-separated list of allowed origins
     # In production set this to your frontend Cloud Run URL
@@ -56,3 +69,4 @@ class Settings(BaseSettings):
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+

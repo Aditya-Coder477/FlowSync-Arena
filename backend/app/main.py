@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.services.firestore import init_firestore, seed_initial_data
 from app.services.redis_client import init_redis, close_redis
+from app.services.cloud_logging import setup_cloud_logging
 from app.routers import zones, routes, queues, alerts, admin, digital_twin, emergency
 
 logging.basicConfig(
@@ -22,6 +23,9 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
+    # Initialize Cloud Logging first so all subsequent logs go to GCP in production
+    setup_cloud_logging()
+
     logger.info("Starting FlowSync Arena API...")
 
     try:
@@ -57,13 +61,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS
+# CORS — explicit methods and headers (not wildcards) for production safety
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
 )
 
 # Routers

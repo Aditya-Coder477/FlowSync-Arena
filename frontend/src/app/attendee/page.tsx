@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import type { ZoneStatus, QueueLive, Alert, Zone, RouteRecommendation } from '@/lib/types'
+import { MOCK_ZONE_STATUS, MOCK_QUEUES, MOCK_ALERTS } from '@/lib/mockData'
 import { Sidebar } from '@/components/Sidebar'
 import { CrowdMap } from '@/components/maps/CrowdMap'
 import {
@@ -74,12 +75,17 @@ function RouteSelector({ zones, from, to, setFrom, setTo, onRecommend }: {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
       <div style={{ flex: 1, minWidth: 140 }}>
-        <label style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+        <label
+          htmlFor="route-from"
+          style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}
+        >
           You&apos;re at
         </label>
         <select
+          id="route-from"
           value={from}
           onChange={e => setFrom(e.target.value)}
+          aria-label="Your current zone"
           style={{
             width: '100%', background: 'var(--bg-overlay)',
             border: '1px solid var(--border-muted)', borderRadius: 'var(--radius-md)',
@@ -94,12 +100,17 @@ function RouteSelector({ zones, from, to, setFrom, setTo, onRecommend }: {
         </select>
       </div>
       <div style={{ flex: 1, minWidth: 140 }}>
-        <label style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+        <label
+          htmlFor="route-to"
+          style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}
+        >
           Going to
         </label>
         <select
+          id="route-to"
           value={to}
           onChange={e => setTo(e.target.value)}
+          aria-label="Your destination zone"
           style={{
             width: '100%', background: 'var(--bg-overlay)',
             border: '1px solid var(--border-muted)', borderRadius: 'var(--radius-md)',
@@ -117,6 +128,7 @@ function RouteSelector({ zones, from, to, setFrom, setTo, onRecommend }: {
         className="btn btn-primary btn-sm"
         disabled={!from || !to || from === to}
         onClick={() => from && to && onRecommend(from, to)}
+        aria-label="Find the least crowded route between selected zones"
       >
         Find route
       </button>
@@ -143,20 +155,30 @@ export default function AttendeeDashboard() {
     routeSectionRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
       const [z, q, a] = await Promise.all([
         api.zones.status(),
         api.queues.live(),
         api.alerts.list(),
       ])
+      // Ignore stale responses after unmount
+      if (signal?.aborted) return
       setZoneStatus(z)
       setQueues(q)
       setAlerts(a.filter(al => !al.resolved).slice(0, 3))
       setError(null)
     } catch (e) {
+      if (signal?.aborted) return
       // Provide simulated data if the API backend is down so the dashboard works
-      const MOCK_ZONE_STATUS: ZoneStatus = {
+      setZoneStatus(MOCK_ZONE_STATUS)
+      setQueues(MOCK_QUEUES)
+      setAlerts(MOCK_ALERTS)
+      setError(null)
+    } finally {
+      if (!signal?.aborted) setLoading(false)
+    }
+  }, [])
         zones: [
           { id: "entrance-north", name: "North Entrance", capacity: 800, current_count: 620, density_level: 'amber', density_pct: 0.775, last_updated: new Date().toISOString(), adjacent_zones: ["main-hall", "gate-a"], amenities: ["exit", "info"], coordinates: {x: 40, y: 5, width: 20, height: 12} },
           { id: "main-hall", name: "Main Hall", capacity: 3000, current_count: 1800, density_level: 'amber', density_pct: 0.60, last_updated: new Date().toISOString(), adjacent_zones: ["entrance-north", "stage-area", "east-wing", "west-wing"], amenities: ["food", "restroom", "info"], coordinates: {x: 25, y: 25, width: 50, height: 35} },
@@ -196,9 +218,13 @@ export default function AttendeeDashboard() {
   }, [])
 
   useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, POLL_INTERVAL)
-    return () => clearInterval(interval)
+    const controller = new AbortController()
+    fetchData(controller.signal)
+    const interval = setInterval(() => fetchData(controller.signal), POLL_INTERVAL)
+    return () => {
+      controller.abort()
+      clearInterval(interval)
+    }
   }, [fetchData])
 
   const handleRecommend = async (from: string, to: string) => {
@@ -281,7 +307,7 @@ export default function AttendeeDashboard() {
     <div className={clsx('dashboard-grid', { 'calm-mode': calmMode })}>
       <Sidebar calmMode={calmMode} />
 
-      <main className="main-content">
+      <main className="main-content" aria-label="Attendee dashboard">
         {/* Page header */}
         <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <div>
@@ -301,8 +327,14 @@ export default function AttendeeDashboard() {
         {alerts.length > 0 && (
           <div style={{ marginBottom: 'var(--space-6)' }}>
             {alerts.slice(0, 1).map(alert => (
-              <div key={alert.id} className={`alert-banner ${alert.severity}`}>
-                <span style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }}>
+              <div
+                key={alert.id}
+                className={`alert-banner ${alert.severity}`}
+                role="alert"
+                aria-live="polite"
+                aria-label={`${alert.severity} alert: ${alert.title}`}
+              >
+                <span style={{ fontSize: 16, flexShrink: 0, marginTop: 2 }} aria-hidden="true">
                   {alert.severity === 'critical' ? '⚠️' : alert.severity === 'warning' ? '💬' : 'ℹ️'}
                 </span>
                 <div>
@@ -379,14 +411,20 @@ export default function AttendeeDashboard() {
               <SectionHeader title="Quick Find" />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)' }}>
                 {helpShortcuts.map(s => (
-                  <button key={s.label} className="card" onClick={() => triggerRoute(s.target)} style={{
-                    cursor: 'pointer', textAlign: 'left',
-                    padding: 'var(--space-3) var(--space-4)',
-                    background: 'var(--bg-elevated)',
-                    border: '1px solid var(--border-subtle)',
-                    borderRadius: 'var(--radius-md)', transition: 'all var(--t-fast)'
-                  }}>
-                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-primary)' }}>{s.label}</div>
+                  <button
+                    key={s.label}
+                    className="card"
+                    onClick={() => triggerRoute(s.target)}
+                    aria-label={`Find route to ${s.label.replace(/[^a-zA-Z ]/g, '').trim()} — ${s.note}`}
+                    style={{
+                      cursor: 'pointer', textAlign: 'left',
+                      padding: 'var(--space-3) var(--space-4)',
+                      background: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-md)', transition: 'all var(--t-fast)'
+                    }}
+                  >
+                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--text-primary)' }} aria-hidden="true">{s.label}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{s.note}</div>
                   </button>
                 ))}

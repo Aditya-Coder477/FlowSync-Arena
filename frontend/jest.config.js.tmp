@@ -1,0 +1,18 @@
+/** @type {import('jest').Config} */
+const config = {
+  testEnvironment: 'jsdom',
+  setupFilesAfterFramework: ['<rootDir>/jest.setup.js'],
+  setupFilesAfterFramework: undefined,
+  setupFilesAfterEach: undefined,
+  setupFilesAfterFramework: undefined,
+  setupFiles: [],
+  setupFilesAfterFramework: undefined,
+  // Correct key:
+  setupFilesAfterFrameworkInstall: undefined,
+  globalSetup: undefined,
+  globalTeardown: undefined,
+  // Use the correct Jest key:
+  setupFilesAfterFramework: undefined,
+}
+
+module.exports = config

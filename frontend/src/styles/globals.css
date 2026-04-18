@@ -893,3 +893,149 @@ code, pre {
     padding: var(--space-4);
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY ADDITIONS
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Skip-to-main-content link (screen readers + keyboard users) ─────────
+   Add <a href="#main-content" class="skip-link">Skip to main content</a>
+   as the very first child of <body> in layout.tsx.                        */
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background: var(--accent-500);
+  color: hsl(221, 30%, 8%);
+  font-weight: 700;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  z-index: 9999;
+  transition: top var(--t-fast);
+}
+
+.skip-link:focus {
+  top: var(--space-4);
+}
+
+/* ── Global focus-visible ring ──────────────────────────────────────────
+   Only shows when the element is focused via keyboard, not mouse/touch.
+   This preserves the design while ensuring keyboard users can navigate.  */
+
+*:focus {
+  outline: none; /* Remove browser default — we provide our own below */
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* Buttons and interactive cards get a slightly thicker ring */
+.btn:focus-visible,
+button:focus-visible,
+.nav-item:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px hsl(196, 80%, 50% / 0.25);
+}
+
+/* Nav items: override with accent color ring */
+.nav-item:focus-visible {
+  background: var(--accent-muted);
+  color: var(--accent-400);
+}
+
+/* Select and input fields */
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 0;
+  border-color: var(--accent-500) !important;
+  box-shadow: 0 0 0 3px hsl(196, 80%, 50% / 0.2);
+}
+
+/* ── Minimum touch target sizes (WCAG 2.5.5 — 44×44px minimum) ─────────
+   Buttons and nav items are touch-friendly on mobile.                     */
+
+@media (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+    padding: 10px var(--space-5);
+  }
+
+  .btn-sm {
+    min-height: 40px;
+  }
+
+  .nav-item {
+    min-height: 44px;
+    padding: 12px var(--space-3);
+  }
+
+  .queue-card, .task-item, .risk-cell {
+    padding: var(--space-5);
+  }
+}
+
+/* ── Reduced motion — respect user's preference ─────────────────────────
+   Disables all animations and transitions for users who set
+   "Reduce Motion" in their OS accessibility settings.
+   This covers epilepsy, vestibular disorders, and cognitive load.         */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Skeleton still needs to be visible — just without the shimmer motion */
+  .skeleton {
+    animation: none;
+    background: var(--bg-elevated);
+  }
+
+  /* Live dot stays visible as a static indicator */
+  .live-dot::before {
+    animation: none;
+    opacity: 0;
+  }
+
+  /* Fade-in elements appear immediately */
+  .fade-in,
+  .fade-in-slow {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── High contrast mode adjustments ────────────────────────────────────── */
+
+@media (prefers-contrast: more) {
+  :root {
+    --text-secondary: hsl(215, 20%, 80%);
+    --text-tertiary: hsl(215, 15%, 60%);
+    --border-subtle: hsl(222, 15%, 30%);
+    --border-muted: hsl(222, 12%, 40%);
+  }
+
+  .badge-green, .badge-amber, .badge-red, .badge-critical {
+    border: 1px solid currentColor;
+  }
+
+  .nav-item.active {
+    outline: 1px solid var(--accent-400);
+  }
+}
+

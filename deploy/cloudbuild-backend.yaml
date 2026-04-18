@@ -1,0 +1,71 @@
+steps:
+  # ── Step 1: Build the Docker image ──────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: build-backend
+    args:
+      - build
+      - --file=backend/Dockerfile
+      - --tag=REGION-docker.pkg.dev/$PROJECT_ID/flowsync/backend:$COMMIT_SHA
+      - --tag=REGION-docker.pkg.dev/$PROJECT_ID/flowsync/backend:latest
+      - --cache-from=REGION-docker.pkg.dev/$PROJECT_ID/flowsync/backend:latest
+      - backend/
+
+  # ── Step 2: Push the image to Artifact Registry ──────────────────────────────
+  - name: 'gcr.io/cloud-builders/docker'
+    id: push-backend
+    args:
+      - push
+      - --all-tags
+      - REGION-docker.pkg.dev/$PROJECT_ID/flowsync/backend
+    waitFor: [build-backend]
+
+  # ── Step 3: Deploy to Cloud Run ───────────────────────────────────────────────
+  - name: 'gcr.io/cloud-builders/gcloud'
+    id: deploy-backend
+    args:
+      - run
+      - deploy
+      - flowsync-backend
+      - --image=REGION-docker.pkg.dev/$PROJECT_ID/flowsync/backend:$COMMIT_SHA
+      - --region=REGION
+      - --platform=managed
+      # Allow unauthenticated access (protected by CORS at the app layer).
+      # Swap for --no-allow-unauthenticated if you add Cloud IAP.
+      - --allow-unauthenticated
+      # Service account with roles/datastore.user and roles/secretmanager.secretAccessor
+      - --service-account=flowsync-backend@$PROJECT_ID.iam.gserviceaccount.com
+      # Environment variables — non-secret config is set here
+      - --set-env-vars=ENVIRONMENT=production
+      - --set-env-vars=GOOGLE_CLOUD_PROJECT=$PROJECT_ID
+      - --set-env-vars=CLOUD_LOGGING_ENABLED=true
+      - --set-env-vars=CLOUD_SECRET_MANAGER_ENABLED=true
+      - --set-env-vars=LOG_LEVEL=INFO
+      # Secrets — pulled from Secret Manager at deploy time
+      # Format: ENV_VAR=<secret-name>:<version>
+      - --set-secrets=REDIS_HOST=REDIS_HOST:latest
+      - --set-secrets=REDIS_PASSWORD=REDIS_PASSWORD:latest
+      - --set-secrets=ALLOWED_ORIGINS=ALLOWED_ORIGINS:latest
+      # Scaling: min 1 to avoid cold starts, max 10 for event load
+      - --min-instances=1
+      - --max-instances=10
+      - --memory=512Mi
+      - --cpu=1
+      - --timeout=60
+      - --concurrency=80
+    waitFor: [push-backend]
+
+# ── Cloud Build configuration ────────────────────────────────────────────────
+# Substitutions — override these with Cloud Build triggers or --substitutions flag
+substitutions:
+  _REGION: europe-west1  # Change to your preferred region
+
+options:
+  # Log build output to Cloud Logging
+  logging: CLOUD_LOGGING_ONLY
+  # Use a faster machine for CI
+  machineType: E2_MEDIUM
+
+# Build artifacts — keep the image for 30 days
+images:
+  - REGION-docker.pkg.dev/$PROJECT_ID/flowsync/backend:$COMMIT_SHA
+  - REGION-docker.pkg.dev/$PROJECT_ID/flowsync/backend:latest

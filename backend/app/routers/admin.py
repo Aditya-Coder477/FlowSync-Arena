@@ -7,10 +7,15 @@ from app.models.schemas import (
     ControlRoomData, RiskZone, StaffDeployment, CommLog, RiskLevel,
 )
 from app.services import firestore as fs
+from app.services import redis_client as rc
 from app.services.crowd import get_zone_status
 from app.services.queue_pred import get_live_queues
+from app.config import get_settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+settings = get_settings()
+
+ADMIN_ANALYTICS_CACHE_KEY = "admin:analytics"
 
 
 # ── Analytics ──────────────────────────────────────────────────────────────
@@ -20,7 +25,14 @@ async def admin_analytics():
     """
     Returns aggregated analytics for the admin dashboard:
     crowd density KPIs, gate performance, trend charts, zone heatmap.
+    Cached in Redis for ADMIN_ANALYTICS_TTL seconds (default 30s) to
+    avoid redundant triple-service reads on every dashboard refresh.
     """
+    # Try Redis cache first
+    cached = await rc.cache_get(ADMIN_ANALYTICS_CACHE_KEY)
+    if cached:
+        return AdminAnalytics(**cached)
+
     zone_status = await get_zone_status()
     queue_status = await get_live_queues()
     alerts = await fs.get_active_alerts()
@@ -82,7 +94,7 @@ async def admin_analytics():
         for z in zones
     ]
 
-    return AdminAnalytics(
+    result = AdminAnalytics(
         kpis=kpis,
         gate_performance=gate_performance,
         density_trend=density_trend,
@@ -90,6 +102,15 @@ async def admin_analytics():
         zone_heatmap=zone_heatmap,
         timestamp=now,
     )
+
+    # Write to Redis cache
+    await rc.cache_set(
+        ADMIN_ANALYTICS_CACHE_KEY,
+        result.model_dump(mode="json"),
+        settings.ADMIN_ANALYTICS_TTL,
+    )
+
+    return result
 
 
 # ── Staff Tasks ────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 """Crowd estimation service — density calculation, Crowd Thermostat algorithm."""
 from __future__ import annotations
 import logging
+import random
 from datetime import datetime, timezone
 from app.models.schemas import DensityLevel, Zone, ZoneStatus
 from app.services import firestore as fs
@@ -109,6 +110,16 @@ async def get_zone_by_id(zone_id: str) -> Zone | None:
     return _enrich_zone(raw)
 
 
+def _thermostat_redirect_message(dest_name: str, alt_name: str) -> str:
+    """Return a randomised but human, calm redirect message for the Crowd Thermostat."""
+    phrases = [
+        f"{dest_name} is getting packed. You might have a better time at {alt_name} right now.",
+        f"Heads up — {dest_name} is quite busy. {alt_name} nearby has more room.",
+        f"We're gently steering folks toward {alt_name} since {dest_name} is near capacity.",
+    ]
+    return random.choice(phrases)
+
+
 def thermostat_redirect(zones: list[Zone], destination_zone_id: str) -> tuple[Zone | None, str | None]:
     """
     Crowd Thermostat: if destination is at or above RED, suggest a similar
@@ -126,12 +137,6 @@ def thermostat_redirect(zones: list[Zone], destination_zone_id: str) -> tuple[Zo
 
     best = min(adjacents, key=lambda z: z.density_pct)
     if best.density_pct < dest.density_pct - 0.15:  # Only redirect if meaningfully better
-        phrases = [
-            f"{dest.name} is getting packed. You might have a better time at {best.name} right now.",
-            f"Heads up — {dest.name} is quite busy. {best.name} nearby has more room.",
-            f"We're gently steering folks toward {best.name} since {dest.name} is near capacity.",
-        ]
-        import random
-        return best, random.choice(phrases)
+        return best, _thermostat_redirect_message(dest.name, best.name)
 
     return None, None
