@@ -13,6 +13,7 @@ env:
   REPOSITORY: flowsync-repo
   BACKEND_SERVICE: flowsync-api
   FRONTEND_SERVICE: flowsync-web
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ── 1. TEST PHASE ──────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ jobs:
         run: |
           cd frontend
           npm ci
-          npm test -- --watchAll=false --passWithNoTests
+          npm test
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8080
 
