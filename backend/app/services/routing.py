@@ -25,10 +25,10 @@ def _build_graph(zones: list[Zone]) -> dict[str, list[tuple[str, float]]]:
     zone_map = {z.id: z for z in zones}
     graph: dict[str, list[tuple[str, float]]] = {z.id: [] for z in zones}
     for zone in zones:
-        cost = DENSITY_COST[zone.density_level]
         for adj_id in zone.adjacent_zones:
             if adj_id in zone_map:
-                graph[zone.id].append((adj_id, cost))
+                adj_cost = DENSITY_COST[zone_map[adj_id].density_level]
+                graph[zone.id].append((adj_id, adj_cost))
     return graph
 
 

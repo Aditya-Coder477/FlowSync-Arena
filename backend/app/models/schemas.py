@@ -21,6 +21,9 @@ class AlertSeverity(str, Enum):
     WARNING = "warning"
     CRITICAL = "critical"
 
+    def __str__(self):
+        return self.value
+
 
 class TaskPriority(str, Enum):
     LOW = "low"
